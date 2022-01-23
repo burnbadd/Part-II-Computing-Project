@@ -44,7 +44,7 @@ def neighbour_product_sum(spin_array, N):
 
 class spin_array():
 
-    def __init__(self, N=3, J=J_model, kb=kb_model, muH=0, random = False):
+    def __init__(self, N=3, J=J_model, kb=kb_model, muH=0, random = False, array_input=None):
 
         self.N = N
         self.J = J_model
@@ -52,12 +52,21 @@ class spin_array():
         self.muH = muH
         self.sites = self.N**2
 
-        if random:
+        if random == True and array_input != None:
+            raise NameError("Array initialisation clash")
+
+        if array_input != None:
+            if array_input.shape == (N,N):
+                self.array = array_input
+            else:
+                raise NameError('input array has wrong dimensions')
+
+        elif random:
             zero_one_array = np.random.randint(2, size=(N,N))
+            self.array = zero_one_array*2 - 1
         else:
             zero_one_array = np.zeros((N,N))
-        
-        self.array = zero_one_array*2 - 1
+            self.array = zero_one_array*2 - 1 
 
     def get_array(self):
         return self.array.copy()
