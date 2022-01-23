@@ -104,15 +104,8 @@ class spin_array():
 
         delta_E = self.flip_delta_E(ij)
 
-        if delta_E <= 0:
+        if np.random.rand() < np.exp(-delta_E/T):
             self.flip_site(ij)
-            return None
-        else:
-            if np.random.rand() < np.exp(-delta_E/T):
-                self.flip_site(ij)
-                return None
-            else:
-                return None
 
     def update_array(self, T, random=True):
 
@@ -129,4 +122,3 @@ class spin_array():
 
                 i, j = n//self.N, n%self.N
                 self.update_site((i,j), T)
-    
