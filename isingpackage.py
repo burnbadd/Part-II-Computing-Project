@@ -44,7 +44,7 @@ def neighbour_product_sum(spin_array, N):
 
 class spin_array():
 
-    def __init__(self, N=3, J=J_model, kb=kb_model, muH=0, random = False, array_input=None):
+    def __init__(self, N=3, J=J_model, kb=kb_model, muH=0, randomseed = None, array_input=None):
 
         self.N = N
         self.J = J_model
@@ -52,7 +52,7 @@ class spin_array():
         self.muH = muH
         self.sites = self.N**2
 
-        if random == True and array_input != None:
+        if randomseed and array_input != None:
             raise NameError("Array initialisation clash")
 
         if array_input != None:
@@ -61,7 +61,8 @@ class spin_array():
             else:
                 raise NameError('input array has wrong dimensions')
 
-        elif random:
+        elif randomseed:
+            np.random.seed(randomseed)
             zero_one_array = np.random.randint(2, size=(N,N))
             self.array = zero_one_array*2 - 1
         else:
@@ -79,6 +80,9 @@ class spin_array():
     def get_E(self):
         E = -self.J*neighbour_product_sum(self.get_array(), self.N) - self.muH*self.get_array().sum()
         return E
+
+    def get_M(self):
+        return self.get_array().sum()
 
     def flip_delta_E(self, ij):
 
@@ -122,3 +126,24 @@ class spin_array():
 
                 i, j = n//self.N, n%self.N
                 self.update_site((i,j), T)
+
+def sma(input_list, n):
+    sma_mask = np.ones(n)/n
+    output = np.convolve(input_list, sma_mask)[:1-n]
+    return output
+
+def eq_time(E_list, bins=50):
+    histogram, bin_edges = np.histogram(E_list, bins=bins)
+    peak_value = bin_edges[np.argmax(histogram)+1]
+
+    eq_steps = None
+
+    for i in range(len(E_list)):
+        if E_list[i]<peak_value:
+            eq_steps = i
+            break
+    
+    if eq_steps == None:
+        raise NameError('eq_steps not found somehow')
+
+    return eq_steps
