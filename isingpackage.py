@@ -144,7 +144,6 @@ class spin_array():
 
         return delta_E_array
 
-
     def update_site(self, ij, T):
         
         i, j = ij
@@ -154,22 +153,6 @@ class spin_array():
         if np.random.rand() < np.exp(-delta_E/T):
             self.flip_site(ij)
 
-    def update_array(self, T, random=True):
-
-        if random:
-            for n in range(self.sites):
-
-                position = np.random.randint(self.sites)
-
-                i, j = position//self.N, position%self.N
-                self.update_site((i,j), T)
-
-        else:
-            for n in range(self.sites):
-
-                i, j = n//self.N, n%self.N
-                self.update_site((i,j), T)
-
     # an array that tells you whether to flip the site or not (True or False)
     def flip_bool_array(self, T):
 
@@ -178,49 +161,7 @@ class spin_array():
 
         return output
     
-    #update the whole array by flipping the sites according to the metropolis algorithm (speed up)
-    def update_array_beta(self, T):
-
-        flip_statement_array = self.flip_bool_array(T)
-
-        # an array which store a 1 for all the flipping and neighbouring sites
-        affected = np.zeros((self.N, self.N))
-
-        chosen_array = np.zeros((self.N, self.N), dtype=int)
-
-        for n in range(self.sites):
-
-            i, j = np.random.randint(self.N), np.random.randint(self.N)
-
-            # if the site chosen is an affected site
-            if affected[i,j]:
-
-                final_flipping = (flip_statement_array*chosen_array)+(np.ones((self.N, self.N))-chosen_array)
-
-                self.array = self.array*(flip_statement_array*chosen_array)+(np.ones((self.N, self.N))-chosen_array)    
-                
-
-                #update our precomputed to the new current spin array
-                flip_statement_array = self.flip_bool_array(T)
-
-                #reset
-                chosen_array = np.zeros((self.N, self.N))
-                affected = np.zeros((self.N, self.N))
-
-
-            chosen_array[i,j] = 1
-
-            #infects the neighbouring sites and itself
-            affected[i,j] = 1
-            affected[i-1,j] = 1
-            affected[(i+1)-self.N,j] = 1
-            affected[i,j-1] = 1
-            affected[i,(j+1)-self.N] = 1
-        
-        self.array = self.array*(flip_statement_array*chosen_array)+(np.ones((self.N, self.N))-chosen_array)    
-
-
-    def update_array_new(self, T):
+    def update_array(self, T):
 
         #update our precomputed to the new current spin array
         flip_statement_array = self.flip_bool_array(T)
@@ -252,10 +193,6 @@ class spin_array():
                 flip_statement_array = self.flip_bool_array(T)
                 #reset our affected list
                 affected = np.zeros((self.N, self.N))
-
-
-
-        
 
 def sma(input_list, n):
     sma_mask = np.ones(n)/n
