@@ -1,6 +1,9 @@
 import numpy as np
 from scipy.signal import convolve2d
-
+import matplotlib.pyplot as plt
+from copy import deepcopy
+from tqdm.notebook import tqdm, trange
+import matplotlib.animation as animation
 
 kb_reality = 1.38064852e-23 #(J/K) Joule per Kelvin
 
@@ -40,13 +43,27 @@ def neighbour_product_sum(spin_array):
 
     return output
 
+def hex2np(hex_str, N):
+    bi_str = bin(int(hex_str,0))[2:]
+    sites = N**2
+
+    if len(bi_str)<sites:
+        bi_str = '0'*(sites-len(bi_str))+bi_str
+
+    #array with 1,0
+    array01 = np.array(list(bi_str), dtype=int)
+
+    #array with 1,-1
+    array1_1 = array01*2-1
+
+    return array1_1.reshape(N, N)
 
 #==============================================================================================
 #==============================================================================================
 
 class spin_array():
 
-    def __init__(self, N=32, J=J_model, kb=kb_model, muH=0, randomseed = None, array_input=None):
+    def __init__(self, N=64, J=J_model, kb=kb_model, muH=0, randomseed = None, hex_input=None):
 
         self.N = N
         self.J = J_model
@@ -54,50 +71,57 @@ class spin_array():
         self.muH = muH
         self.sites = self.N**2
 
-        if randomseed and array_input != None:
+        if randomseed and hex_input != None:
             raise NameError("Array initialisation clash")
 
-        if array_input != None:
-            if array_input.shape == (N,N):
-                self.array = array_input
-            else:
-                raise NameError('input array has wrong dimensions')
+        if hex_input != None:
+            self.load_hex(hex_input)
 
         elif randomseed != None:
             np.random.seed(randomseed)
             zero_one_array = np.random.randint(2, size=(N,N))
             self.array = zero_one_array*2 - 1
         else:
-            zero_one_array = np.zeros((N,N))
+            zero_one_array = np.zeros((N,N), dtype=int)
             self.array = zero_one_array*2 - 1 
 
-
-    #return two dimensional indices i and j from a 1D index (0~N-1)
-    def n2ij(self, n):
-        i, j = n//self.N, n%self.N
-
-        return (i,j)
-
-    def ij2n(self,ij):
-        i, j = ij
-        n = self.N*i + j
-
-        return n
+    def set_array(self, input_array):
+        if input_array.shape == (self.N, self.N):
+            self.array = input_array.copy()
+        else:
+            raise NameError('shape should be '+ str((self.N, self.N)) + ' but got ' + str(input_array.shape))
 
     def get_array(self):
         return self.array.copy()
-
-    def flip_site(self, ij):
-        i, j = ij
-        self.array[i,j] *= -1
-        return self
 
     def get_E(self):
         E = -self.J*neighbour_product_sum(self.get_array()) - self.muH*self.get_array().sum()
         return E
 
+    def min_E(self):
+
+        min_array = np.ones((self.N,self.N))
+
+        E = -self.J*neighbour_product_sum(min_array) - self.muH*min_array.sum()
+        return E
+
     def get_M(self):
         return self.get_array().sum()
+
+    def get_hex_str(self):
+        #1d array with 1 and -1
+        np_array_1d = self.get_array().flatten()
+        #convert 1,-1 to 1,0
+        np_array_1d = (np_array_1d+1)//2
+        x = self.sites + 10
+        bi_str = np.array2string(np_array_1d, separator='', max_line_width = x, threshold = x)[1:-1]
+        hex_str = hex(int(bi_str,2))
+
+        return hex_str
+
+    def load_hex(self, hex_str):
+        
+        self.set_array(hex2np(hex_str, self.N))
 
     def flip_delta_E(self, ij):
 
@@ -118,6 +142,7 @@ class spin_array():
         return delta_E
 
 
+    
     def flip_delta_E_array(self):
 
         spin_array = self.get_array()
@@ -144,15 +169,6 @@ class spin_array():
 
         return delta_E_array
 
-    def update_site(self, ij, T):
-        
-        i, j = ij
-
-        delta_E = self.flip_delta_E(ij)
-
-        if np.random.rand() < np.exp(-delta_E/T):
-            self.flip_site(ij)
-
     # an array that tells you whether to flip the site or not (True or False)
     def flip_bool_array(self, T):
 
@@ -178,7 +194,8 @@ class spin_array():
 
                 if flip_statement_array[i,j]:
 
-                    self.flip_site((i,j))
+                    #flipping site ij
+                    self.array[i,j] *= -1
 
                     affected[i,j] = 1
                     affected[i-1,j] = 1
@@ -194,23 +211,116 @@ class spin_array():
                 #reset our affected list
                 affected = np.zeros((self.N, self.N))
 
-def sma(input_list, n):
-    sma_mask = np.ones(n)/n
-    output = np.convolve(input_list, sma_mask)[:1-n]
-    return output
+    def plot(self):
+        fig, ax = plt.subplots(figsize=(5,5))
+        ax.imshow(self.get_array())
 
-def eq_time(E_list, bins=50):
-    histogram, bin_edges = np.histogram(E_list, bins=bins)
-    peak_value = bin_edges[np.argmax(histogram)+1]
+class hex_series():
 
-    eq_steps = None
+    def __init__(self, T=1, N=64, J=J_model, kb=kb_model, muH=0, randomseed=None, initial_hex=None):
 
-    for i in range(len(E_list)):
-        if E_list[i]<peak_value:
-            eq_steps = i
-            break
+        self.N = N
+        self.J = J_model
+        self.kb = kb_model
+        self.muH = muH
+        self.sites = self.N**2
+        self.T = T
+        self.hex_list = []
+
+        if randomseed != None:
+            if initial_hex!=None:
+                raise NameError('initial conditions settings clash')
+            self.append_array(spin_array(N=N, randomseed=randomseed))
+        elif initial_hex == None:
+            pass
+        else:
+            self.append_hex(initial_hex)
+
+    def append_array(self, new_spin_array):
+        if not type(new_spin_array) is spin_array:
+            raise NameError('This is a' + str(type(new_spin_array)) + ',not ' + str(type(spin_array)))
+        
+        if not new_spin_array.N == self.N:
+            raise NameError('N is wrong:'+ str(new_spin_array.N))
+        
+
+        self.hex_list.append(new_spin_array.get_hex_str())
+
+    def append_hex(self, hex_str):
+        self.hex_list.append(hex_str)
+
+    def evolve(self, frames):
+
+        if len(self.hex_list) ==0:
+            raise NameError('its empty')
+            
+        if len(self.hex_list) >= frames:
+            raise NameError('its already looong enough')
+
+        last_hex = self.hex_list[-1]
+
+        obj = spin_array(N=self.N, J=self.J, kb=self.kb, muH=self.muH, hex_input=last_hex)
+
+        for i in trange(frames-len(self.hex_list)):
+            obj.update_array(self.T)
+            self.append_array(obj)
+
+    def save_txt(self, suffix=''):
+        name_T = str(self.T*100).zfill(3)
+        name_muH = str(self.muH).zfill(3)
+        name_N = str(self.N).zfill(3)
+
+
+        file_name = 'N='+name_N+'_T='+name_T+'_muH='+name_muH+'_frames='+str(len(self.hex_list))+suffix
+
+        file_string = '\n'.join(self.hex_list)
+
+        with open(file_name + '.txt', 'w') as f:
+            f.write(file_string)
+
+    def get_E_list(self):
+
+        obj = spin_array(N=self.N, J=self.J, kb=self.kb, muH=self.muH)
+        E_list = []
+
+        for i in range(len(self.hex_list)):
+            obj.load_hex(self.hex_list[i])
+            E_list.append(obj.get_E())
+        
+        return E_list
+
+    def get_len(self):
+        return len(self.hex_list)
+
+    def get_frame_hex(self, frame):
+        return self.hex_list[frame]
     
-    if eq_steps == None:
-        raise NameError('eq_steps not found somehow')
+    def get_frame_np(self, frame):
+        return hex2np(self.hex_list[frame], self.N)
 
-    return eq_steps
+    def min_E(self):
+        obj = spin_array(N=self.N, J=self.J, kb=self.kb, muH=self.muH)
+        return obj.min_E()
+
+    def load_txt(file_name):
+
+        para = {}
+        target = {'N', 'T', 'H'}
+        digits = '0123456789'
+
+        for i in range(len(file_name)):
+
+            if file_name[i] in target:
+                
+                para[file_name[i]] = file_name[i+2:i+5]
+
+        T = int(para['T'])/100
+        N = int(para['N'])
+        muH = int(para['H'])
+        
+        series = hex_series(T=T, N=N, muH=muH)
+
+        with open(file_name, 'r') as f:
+            series.hex_list = f.readlines()
+        
+        return series
