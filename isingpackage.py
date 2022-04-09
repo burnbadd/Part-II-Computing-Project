@@ -12,7 +12,6 @@ kb_model = 1 #(Energy arb unit / Temp arb unit)
 
 # then measured T in the model would have unit J_model/kb_model (with arb Temp unit)
 
-
 def cbdc(spin_array):
     #create a N+2 2D array with cyclic boundary condition on the sides
 
@@ -215,6 +214,8 @@ class spin_array():
         fig, ax = plt.subplots(figsize=(5,5))
         ax.imshow(self.get_array())
 
+txt_location = 'data\\'
+
 class hex_series():
 
     def __init__(self, T=1, N=64, J=J_model, kb=kb_model, muH=0, randomseed=None, initial_hex=None):
@@ -236,6 +237,10 @@ class hex_series():
         else:
             self.append_hex(initial_hex)
 
+    def get_para(self):
+        output = 'N={}, T={}, muH={}'.format(self.N, self.T, self.muH)
+        return(output)
+
     def append_array(self, new_spin_array):
         if not type(new_spin_array) is spin_array:
             raise NameError('This is a' + str(type(new_spin_array)) + ',not ' + str(type(spin_array)))
@@ -249,7 +254,7 @@ class hex_series():
     def append_hex(self, hex_str):
         self.hex_list.append(hex_str)
 
-    def evolve(self, frames):
+    def evolve(self, frames, bar=False):
 
         if len(self.hex_list) ==0:
             raise NameError('its empty')
@@ -261,21 +266,36 @@ class hex_series():
 
         obj = spin_array(N=self.N, J=self.J, kb=self.kb, muH=self.muH, hex_input=last_hex)
 
-        for i in trange(frames-len(self.hex_list)):
-            obj.update_array(self.T)
-            self.append_array(obj)
+        if bar:
+            for i in trange(frames-len(self.hex_list)):
+                obj.update_array(self.T)
+                self.append_array(obj)
+        else:
+            for i in range(frames-len(self.hex_list)):
+                obj.update_array(self.T)
+                self.append_array(obj)
 
-    def save_txt(self, suffix=''):
-        name_T = str(self.T*100).zfill(3)
+
+    def txt_file_name(self, suffix='', frames = None):
+        name_T = str(int(self.T*100)).zfill(3)
         name_muH = str(self.muH).zfill(3)
         name_N = str(self.N).zfill(3)
 
+        if frames ==None:
+            name_frames = str(len(self.hex_list))
+        else:
+            name_frames = str(int(frames))
 
-        file_name = 'N='+name_N+'_T='+name_T+'_muH='+name_muH+'_frames='+str(len(self.hex_list))+suffix
+        file_name = txt_location+'N='+name_N+'_T='+name_T+'_muH='+name_muH+'_frames='+name_frames+suffix+'.txt'
+
+        return file_name
+
+
+    def save_txt(self, suffix=''):
 
         file_string = '\n'.join(self.hex_list)
 
-        with open(file_name + '.txt', 'w') as f:
+        with open(self.txt_file_name(suffix=suffix), 'w') as f:
             f.write(file_string)
 
     def get_E_list(self):
@@ -288,6 +308,19 @@ class hex_series():
             E_list.append(obj.get_E())
         
         return E_list
+
+    def get_M_list(self):
+
+        obj = spin_array(N=self.N, J=self.J, kb=self.kb, muH=self.muH)
+        M_list = []
+
+        for i in range(len(self.hex_list)):
+            obj.load_hex(self.hex_list[i])
+            M_list.append(obj.get_M())
+        
+        return M_list
+
+
 
     def get_len(self):
         return len(self.hex_list)
