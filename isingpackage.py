@@ -277,7 +277,7 @@ class hex_series():
 
 
     def txt_file_name(self, suffix='', frames = None):
-        name_T = str(int(self.T*100)).zfill(3)
+        name_T = str(round(self.T*100)).zfill(3)
         name_muH = str(self.muH).zfill(3)
         name_N = str(self.N).zfill(3)
 
