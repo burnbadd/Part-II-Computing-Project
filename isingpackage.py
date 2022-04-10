@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 from tqdm.notebook import tqdm, trange
 import matplotlib.animation as animation
+from numba import jit
 
 kb_reality = 1.38064852e-23 #(J/K) Joule per Kelvin
 
@@ -58,6 +59,35 @@ def hex2np(hex_str, N):
     return array1_1.reshape(N, N)
 
 #==============================================================================================
+
+#a faster version of update array which require no global variable
+@jit
+def update_array_jit(input_array, T, muH=0):
+
+    N = input_array.shape[0]
+
+    for n in range(N**2):
+
+        position = np.random.randint(N**2)
+        i, j = position//N, position%N
+
+
+
+
+        site_ij = input_array[i,j]
+
+        nearest_neighbour_sum = (input_array[(i+1)%N,j] +
+                                input_array[(i-1)%N,j] +
+                                input_array[i,(j+1)%N] +
+                                input_array[i,(j-1)%N])
+        delta_E = 2*(site_ij*nearest_neighbour_sum + muH*site_ij)
+
+        if np.random.rand() < np.exp(-delta_E/T):
+            input_array[i,j] *= -1
+    
+    return input_array
+
+
 #==============================================================================================
 
 class spin_array():
@@ -210,6 +240,11 @@ class spin_array():
                 #reset our affected list
                 affected = np.zeros((self.N, self.N))
 
+    def update_array_jit(self, T, muH=0):
+        
+        self.array = update_array_jit(self.get_array(), T, muH=muH)
+        
+
     def plot(self):
         fig, ax = plt.subplots(figsize=(5,5))
         ax.imshow(self.get_array())
@@ -275,6 +310,26 @@ class hex_series():
                 obj.update_array(self.T)
                 self.append_array(obj)
 
+    def evolve_jit(self, frames, bar=False):
+
+        if len(self.hex_list) ==0:
+            raise NameError('its empty')
+            
+        if len(self.hex_list) >= frames:
+            raise NameError('its already looong enough')
+
+        last_hex = self.hex_list[-1]
+
+        obj = spin_array(N=self.N, J=self.J, kb=self.kb, muH=self.muH, hex_input=last_hex)
+
+        if bar:
+            for i in trange(frames-len(self.hex_list)):
+                obj.update_array_jit(self.T)
+                self.append_array(obj)
+        else:
+            for i in range(frames-len(self.hex_list)):
+                obj.update_array_jit(self.T)
+                self.append_array(obj)
 
     def txt_file_name(self, suffix='', frames = None):
         name_T = str(round(self.T*100)).zfill(3)
