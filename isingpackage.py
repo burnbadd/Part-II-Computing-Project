@@ -205,42 +205,8 @@ class spin_array():
         output = random_array < np.exp(-self.flip_delta_E_array()/T)
 
         return output
-    
-    def update_array(self, T):
 
-        #update our precomputed to the new current spin array
-        flip_statement_array = self.flip_bool_array(T)
-        #reset our affected list
-        affected = np.zeros((self.N, self.N))
-
-        for n in range(self.sites):
-
-            position = np.random.randint(self.sites)
-
-            i, j = position//self.N, position%self.N
-
-            if affected[i,j] == 0:
-
-                if flip_statement_array[i,j]:
-
-                    #flipping site ij
-                    self.array[i,j] *= -1
-
-                    affected[i,j] = 1
-                    affected[i-1,j] = 1
-                    affected[(i+1)-self.N,j] = 1
-                    affected[i,j-1] = 1
-                    affected[i,(j+1)-self.N] = 1
-
-            #if the position that we chose is next to or is a site that we flipped
-            else:
-
-                #update our precomputed to the new current spin array
-                flip_statement_array = self.flip_bool_array(T)
-                #reset our affected list
-                affected = np.zeros((self.N, self.N))
-
-    def update_array_jit(self, T, muH=0):
+    def update_array(self, T, muH=0):
         
         self.array = update_array_jit(self.get_array(), T, muH=muH)
         
@@ -308,27 +274,6 @@ class hex_series():
         else:
             for i in range(frames-len(self.hex_list)):
                 obj.update_array(self.T)
-                self.append_array(obj)
-
-    def evolve_jit(self, frames, bar=False):
-
-        if len(self.hex_list) ==0:
-            raise NameError('its empty')
-            
-        if len(self.hex_list) >= frames:
-            raise NameError('its already looong enough')
-
-        last_hex = self.hex_list[-1]
-
-        obj = spin_array(N=self.N, J=self.J, kb=self.kb, muH=self.muH, hex_input=last_hex)
-
-        if bar:
-            for i in trange(frames-len(self.hex_list)):
-                obj.update_array_jit(self.T)
-                self.append_array(obj)
-        else:
-            for i in range(frames-len(self.hex_list)):
-                obj.update_array_jit(self.T)
                 self.append_array(obj)
 
     def txt_file_name(self, suffix='', frames = None):
