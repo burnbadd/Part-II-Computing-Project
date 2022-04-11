@@ -136,6 +136,9 @@ class spin_array():
 
     def get_M(self):
         return self.get_array().sum()
+    
+    def get_M_mean(self):
+        return self.get_array().sum()/self.sites
 
     def get_hex_str(self):
         #1d array with 1 and -1
