@@ -88,10 +88,10 @@ def hex2np(hex_str, N):
 
 @jit
 def update_array_jit(input_array, T, muH=0):
-    """update_array_jit updates the 2D spin array by carrying out N*N monte-carlo steps on randomly selected sites according to the metropolis algorithm and the given temperature and H-field. For jit compilation to work, the function is required to have to global variable, therefore the existence of the function definition outside the class spin_array.
+    """update_array_jit updates the 2D spin array by carrying out N*N monte-carlo steps according to the metropolis algorithm with the given temperature and H-field, on randomly selected sites. For jit compilation to work, the function is required to have use no global variables.
 
     Args:
-        input_array (np array): the 2d spin array
+        input_array (np array): the 2D spin array
         T (float): Temperature of the surrounding
         muH (float, optional): The H-field strength(given in muH since it's strength depends on the ratio of mu/J). Defaults to 0.
 
@@ -348,7 +348,7 @@ class hex_series():
 
         last_hex = self.hex_list[-1]
 
-        obj = spin_array(N=self.N, J=self.J, kb=self.kb, muH=self.muH, hex_input=last_hex)
+        obj = spin_array(N=self.N, J=self.J, kb=self.kb, hex_input=last_hex)
 
         if bar:
             for i in trange(frames-len(self.hex_list)):
@@ -406,12 +406,12 @@ class hex_series():
             list of float: a list of total energy of each frame
         """
         #a dummy object of spin_array to call the method get_E()
-        obj = spin_array(N=self.N, J=self.J, kb=self.kb, muH=self.muH)
+        obj = spin_array(N=self.N, J=self.J, kb=self.kb)
         E_list = []
 
         for i in range(len(self.hex_list)):
             obj.load_hex(self.hex_list[i])
-            E_list.append(obj.get_E())
+            E_list.append(obj.get_E(muH=muH))
         
         return E_list
 
@@ -422,7 +422,7 @@ class hex_series():
             list of float: a list of total magnetic moment of each frame
         """
 
-        obj = spin_array(N=self.N, J=self.J, kb=self.kb, muH=self.muH)
+        obj = spin_array(N=self.N, J=self.J, kb=self.kb)
         M_list = []
 
         for i in range(len(self.hex_list)):
